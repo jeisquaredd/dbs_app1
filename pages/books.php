@@ -1,11 +1,41 @@
+<?php
+require_once('../classes/database.php');
+session_start();
+
+$con = new database();
+
+$allbooks = $con->viewbooks();
+
+
+
+if(isset($_POST['delete_books'])){
+    $book_id = $_POST['book_id'];
+    $book_title = $_POST['book_title'];
+    $_SESSION['book_title'] = $book_title;
+
+    try{
+      $con->deletebooks($book_id);
+      $_SESSION['success_message'] =  $_SESSION['book_title'] . ' has been deleted in the database.';
+      header('Location: books.php');
+      exit();
+     
+      } catch(Exception $e) {
+        $error_message = "Cannot delete this book. It may have active loans or copies in use.";
+      }
+   
+}
+
+
+?>
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Books — Admin</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css ">
   <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../sweetalert/dist/sweetalert2.css ">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
@@ -32,6 +62,28 @@
 </nav>
 
 <main class="container py-4">
+
+
+<?php if(isset($error_message)){ ?>
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+  <strong>Error! </strong> <?php echo $error_message; ?>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+   
+  </button>
+</div>
+<?php } ?>
+
+<?php if(isset($_SESSION['success_message'])){ ?>
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <strong>Success! </strong> <?php echo $_SESSION['success_message']; ?>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+   
+  </button>
+</div>
+<?php
+  unset($_SESSION['success_message']);
+} ?>
+
   <div class="row g-3">
     <div class="col-12 col-lg-4">
       <div class="card p-4">
@@ -108,7 +160,7 @@
           </div>
         </div>
 
-        <div class="table-responsive">
+         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead class="table-light">
               <tr>
@@ -123,32 +175,45 @@
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>1</td>
-                <td>Noli Me Tangere</td>
-                <td>9789710810736</td>
-                <td>1887</td>
-                <td>National Book Store</td>
-                <td>3</td>
-                <td><span class="badge text-bg-success">2</span></td>
-                <td class="text-end">
-                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editBookModal">Edit</button>
-                  <button class="btn btn-sm btn-outline-danger">Delete</button>
-                </td>
-              </tr>
-              <tr>
-                <td>4</td>
-                <td>Smaller and Smaller Circles</td>
-                <td>9789712721768</td>
-                <td>2002</td>
-                <td>Ateneo de Manila University Press</td>
-                <td>2</td>
-                <td><span class="badge text-bg-warning">1</span></td>
-                <td class="text-end">
-                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editBookModal">Edit</button>
-                  <button class="btn btn-sm btn-outline-danger">Delete</button>
-                </td>
-              </tr>
+              <?php
+              foreach ($allbooks as $book) {
+              echo '<tr>';
+
+            
+
+              echo'<td>' . $book['book_id'] . '</td>';
+              echo'<td>' . $book['book_title'] . '</td>';
+              echo'<td>' . $book['book_isbn'] . '</td>';
+              echo'<td>' . $book['book_publication_year'] . '</td>';
+              echo'<td>' . $book['book_publisher'] . '</td>';
+              echo'<td class="text-center">' . $book['Copies'] . '</td>';
+              echo'<td class="text-center"><span class="badge text-bg-success">' . $book['Available_Copies'] . '</span></td>';
+              echo'<td class="text-end">';
+              echo'<div class="btn-group" role="group">';
+
+              echo'<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editBookModal"
+
+              data-book-id="' . $book['book_id'] . '"
+              data-book-title="' . $book['book_title'] . '"
+              data-book-isbn="' . $book['book_isbn'] . '"
+              data-book-publication-year="' . $book['book_publication_year'] . '"
+              data-book-publisher="' . $book['book_publisher'] . '"
+
+              >Edit</button>';
+
+              echo'<button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteBookModal"
+
+              data-book-id="' . $book['book_id'] . '"
+              data-book-title="' . $book['book_title'] . '"
+              
+              >Delete</button>';
+              
+              echo'  </td>';
+              echo'</tr>';
+              }
+
+              ?>
+          
             </tbody>
           </table>
         </div>
@@ -249,6 +314,52 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Delete Book Modal (UI only) -->
+<div class="modal fade" id="deleteBookModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete Book</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+       <p>Are you sure you want to delete <strong id="delete_book_title"></strong>?</p>
+       <p class="text-danger small">This action cannot be undone.</p>
+
+        <form action="#" method="POST">
+          <input type="hidden" name="book_id" id="delete_book_id" >
+          <input type="hidden" name="book_title" id="delete_book_titles" >
+          
+         <div class="d-flex gap-2 justify-content-end"> 
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" >Cancel</button>
+
+           <button type="submit" class="btn btn-danger" name="delete_books" >Delete</button>
+
+         </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script src="../bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="../sweetalert/dist/sweetalert2.js"></script>
+
+<script>
+  const deleteBookModal = document.getElementById('deleteBookModal');
+  deleteBookModal.addEventListener('show.bs.modal', function(event){
+
+  const btn = event.relatedTarget;
+  if(!btn) return;
+
+  document.getElementById('delete_book_id').value = btn.getAttribute('data-book-id') || '';
+  document.getElementById('delete_book_titles').value = btn.getAttribute('data-book-title') || '';
+
+  document.getElementById('delete_book_title').textContent = btn.getAttribute('data-book-title') || '';
+
+  });
+
+</script>
 </body>
 </html>
